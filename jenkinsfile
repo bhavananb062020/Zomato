@@ -8,9 +8,11 @@ pipeline {
 
     environment {
         SCANNER_HOME = tool 'sonar-scanner'
+        DOCKER_CONFIG = '/var/lib/jenkins/.docker'
     }
 
     stages {
+
         stage('Clean Workspace') {
             steps {
                 cleanWs()
@@ -43,7 +45,7 @@ pipeline {
             }
         }
 
-        stage('Install NPM Dependencies') {
+        stage('Install Dependencies') {
             steps {
                 sh 'npm install'
             }
@@ -51,8 +53,14 @@ pipeline {
 
         stage('OWASP Dependency Check') {
             steps {
-                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit -n', odcInstallation: 'DP-Check'
-                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+                dependencyCheck(
+                    odcInstallation: 'DP-Check',
+                    additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit'
+                )
+
+                dependencyCheckPublisher(
+                    pattern: '**/dependency-check-report.xml'
+                )
             }
         }
 
@@ -68,12 +76,16 @@ pipeline {
             }
         }
 
-        stage('Tag & Push DockerHub') {
+        stage('Tag Docker Image') {
+            steps {
+                sh 'docker tag zomato bhavananb062020/zomato:latest'
+            }
+        }
+
+        stage('Push Docker Image') {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'docker') {
-                        sh 'docker tag zomato bhavananb062020/zomato:latest'
-
                         sh 'docker push bhavananb062020/zomato:latest'
                     }
                 }
@@ -85,8 +97,12 @@ pipeline {
                 script {
                     withDockerRegistry(credentialsId: 'docker') {
                         sh '''
+                        export DOCKER_CONFIG=/var/lib/jenkins/.docker
+
                         /var/lib/jenkins/.docker/cli-plugins/docker-scout quickview bhavananb062020/zomato:latest
+
                         /var/lib/jenkins/.docker/cli-plugins/docker-scout cves bhavananb062020/zomato:latest
+
                         /var/lib/jenkins/.docker/cli-plugins/docker-scout recommendations bhavananb062020/zomato:latest
                         '''
                     }
@@ -98,7 +114,6 @@ pipeline {
             steps {
                 sh '''
                 docker rm -f zomato || true
-
                 docker run -d \
                 --name zomato \
                 -p 3000:3000 \
@@ -106,34 +121,23 @@ pipeline {
                 '''
             }
         }
+
     }
 
     post {
+
         always {
-            emailext(
-                attachLog: true,
-                subject: "${currentBuild.currentResult}: ${env.JOB_NAME}",
-                body: """
-                <html>
-                <body>
-
-                <h2>Zomato CI/CD Pipeline</h2>
-
-                <p><b>Build Status:</b> ${currentBuild.currentResult}</p>
-
-                <p><b>Job:</b> ${env.JOB_NAME}</p>
-
-                <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
-
-                <p><b>Build URL:</b> ${env.BUILD_URL}</p>
-
-                </body>
-                </html>
-                """,
-                to: 'bhavananb2003@gmail.com',
-                mimeType: 'text/html',
-                attachmentsPattern: 'trivy.txt'
-            )
+            archiveArtifacts artifacts: 'trivy.txt', fingerprint: true
         }
+
+        success {
+            echo 'Pipeline completed successfully.'
+        }
+
+        failure {
+            echo 'Pipeline failed.'
+        }
+
     }
+
 }
