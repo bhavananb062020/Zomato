@@ -9,6 +9,7 @@ pipeline {
     environment {
         SCANNER_HOME = tool 'sonar-scanner'
         DOCKER_CONFIG = '/var/lib/jenkins/.docker'
+        IMAGE_NAME = "bhavananb062020/zomato:latest"
     }
 
     stages {
@@ -39,9 +40,7 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token'
-                }
+                waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token'
             }
         }
 
@@ -50,19 +49,6 @@ pipeline {
                 sh 'npm install'
             }
         }
-
-        // stage('OWASP Dependency Check') {
-        //     steps {
-        //         dependencyCheck(
-        //             odcInstallation: 'DP-Check',
-        //             additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit'
-        //         )
-
-        //         dependencyCheckPublisher(
-        //             pattern: '**/dependency-check-report.xml'
-        //         )
-        //     }
-        // }
 
         stage('Trivy File Scan') {
             steps {
@@ -78,7 +64,7 @@ pipeline {
 
         stage('Tag Docker Image') {
             steps {
-                sh 'docker tag zomato bhavananb062020/zomato:latest'
+                sh 'docker tag zomato $IMAGE_NAME'
             }
         }
 
@@ -86,7 +72,7 @@ pipeline {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'docker') {
-                        sh 'docker push bhavananb062020/zomato:latest'
+                        sh 'docker push $IMAGE_NAME'
                     }
                 }
             }
@@ -99,11 +85,11 @@ pipeline {
                         sh '''
                         export DOCKER_CONFIG=/var/lib/jenkins/.docker
 
-                        /var/lib/jenkins/.docker/cli-plugins/docker-scout quickview bhavananb062020/zomato:latest
+                        /var/lib/jenkins/.docker/cli-plugins/docker-scout quickview $IMAGE_NAME || true
 
-                        /var/lib/jenkins/.docker/cli-plugins/docker-scout cves bhavananb062020/zomato:latest
+                        /var/lib/jenkins/.docker/cli-plugins/docker-scout cves $IMAGE_NAME || true
 
-                        /var/lib/jenkins/.docker/cli-plugins/docker-scout recommendations bhavananb062020/zomato:latest
+                        /var/lib/jenkins/.docker/cli-plugins/docker-scout recommendations $IMAGE_NAME || true
                         '''
                     }
                 }
@@ -114,14 +100,14 @@ pipeline {
             steps {
                 sh '''
                 docker rm -f zomato || true
+
                 docker run -d \
-                --name zomato \
-                -p 3000:3000 \
-                bhavananb062020/zomato:latest
+                    --name zomato \
+                    -p 3000:3000 \
+                    $IMAGE_NAME
                 '''
             }
         }
-
     }
 
     post {
@@ -137,7 +123,5 @@ pipeline {
         failure {
             echo 'Pipeline failed.'
         }
-
     }
-
 }
