@@ -85,11 +85,9 @@ pipeline {
                 script {
                     withDockerRegistry(credentialsId: 'docker') {
                         sh '''
-                        export DOCKER_CONFIG=/var/lib/jenkins/.docker
-
-                        docker scout quickview bhavananb062020/zomato:latest
-                        docker scout cves bhavananb062020/zomato:latest
-                        docker scout recommendations bhavananb062020/zomato:latest
+                        /var/lib/jenkins/.docker/cli-plugins/docker-scout quickview bhavananb062020/zomato:latest
+                        /var/lib/jenkins/.docker/cli-plugins/docker-scout cves bhavananb062020/zomato:latest
+                        /var/lib/jenkins/.docker/cli-plugins/docker-scout recommendations bhavananb062020/zomato:latest
                         '''
                     }
                 }
