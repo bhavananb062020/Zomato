@@ -11,20 +11,19 @@ pipeline {
     }
 
     stages {
-
-        stage("Clean Workspace") {
+        stage('Clean Workspace') {
             steps {
                 cleanWs()
             }
         }
 
-        stage("Git Checkout") {
+        stage('Git Checkout') {
             steps {
                 git 'https://github.com/bhavananb062020/Zomato.git'
             }
         }
 
-        stage("SonarQube Analysis") {
+        stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('sonar-server') {
                     sh '''
@@ -36,7 +35,7 @@ pipeline {
             }
         }
 
-        stage("Quality Gate") {
+        stage('Quality Gate') {
             steps {
                 script {
                     waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token'
@@ -44,36 +43,35 @@ pipeline {
             }
         }
 
-        stage("Install NPM Dependencies") {
+        stage('Install NPM Dependencies') {
             steps {
                 sh 'npm install'
             }
         }
 
-        stage("OWASP Dependency Check") {
+        stage('OWASP Dependency Check') {
             steps {
                 dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit -n', odcInstallation: 'DP-Check'
                 dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
             }
         }
 
-        stage("Trivy File Scan") {
+        stage('Trivy File Scan') {
             steps {
                 sh 'trivy fs . > trivy.txt'
             }
         }
 
-        stage("Build Docker Image") {
+        stage('Build Docker Image') {
             steps {
                 sh 'docker build -t zomato .'
             }
         }
 
-        stage("Tag & Push DockerHub") {
+        stage('Tag & Push DockerHub') {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'docker') {
-
                         sh 'docker tag zomato bhavananb062020/zomato:latest'
 
                         sh 'docker push bhavananb062020/zomato:latest'
@@ -82,26 +80,24 @@ pipeline {
             }
         }
 
-        stage("Docker Scout Scan") {
+        stage('Docker Scout Scan') {
             steps {
                 script {
-
                     withDockerRegistry(credentialsId: 'docker') {
+                        sh '''
+                        export DOCKER_CONFIG=/var/lib/jenkins/.docker
 
-                        sh 'docker scout quickview bhavananb062020/zomato:latest'
-
-                        sh 'docker scout cves bhavananb062020/zomato:latest'
-
-                        sh 'docker scout recommendations bhavananb062020/zomato:latest'
+                        docker scout quickview bhavananb062020/zomato:latest
+                        docker scout cves bhavananb062020/zomato:latest
+                        docker scout recommendations bhavananb062020/zomato:latest
+                        '''
                     }
-
                 }
             }
         }
 
-        stage("Deploy Container") {
+        stage('Deploy Container') {
             steps {
-
                 sh '''
                 docker rm -f zomato || true
 
@@ -110,16 +106,12 @@ pipeline {
                 -p 3000:3000 \
                 bhavananb062020/zomato:latest
                 '''
-
             }
         }
-
     }
 
     post {
-
         always {
-
             emailext(
                 attachLog: true,
                 subject: "${currentBuild.currentResult}: ${env.JOB_NAME}",
@@ -140,13 +132,10 @@ pipeline {
                 </body>
                 </html>
                 """,
-                to: "bhavananb2003@gmail.com",
-                mimeType: "text/html",
-                attachmentsPattern: "trivy.txt"
+                to: 'bhavananb2003@gmail.com',
+                mimeType: 'text/html',
+                attachmentsPattern: 'trivy.txt'
             )
-
         }
-
     }
-
 }
