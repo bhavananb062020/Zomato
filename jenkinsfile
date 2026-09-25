@@ -31,8 +31,8 @@ pipeline {
                 withSonarQubeEnv('sonarqube') {     //system  #Zomato - see in sonarqube
                     sh '''
                     $SCANNER_HOME/bin/sonar-scanner \
-                    -Dsonar.projectName=zomato \
-                    -Dsonar.projectKey=zomato
+                    -Dsonar.projectName=Zomato \
+                    -Dsonar.projectKey=Zomato
                     '''
                 }
             }
